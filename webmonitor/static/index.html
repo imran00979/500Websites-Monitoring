@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website Monitor</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2;
+  --surface: #fcfcfb;
+  --surface-2: #f0efec;
+  --border: #e2e1dc;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #7a7974;
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --pending: #b5b4ae;
+  --grid: #e8e7e2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --border: #2f2f2c;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #8f8e86;
+    --accent: #3987e5;
+    --pending: #5a5955;
+    --grid: #2a2a27;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --border: #2f2f2c;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --ink-3: #8f8e86;
+  --accent: #3987e5;
+  --pending: #5a5955;
+  --grid: #2a2a27;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 1400px; margin: 0 auto; padding: 20px 16px 48px; }
+
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+.meta { color: var(--ink-2); font-size: 13px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  border: 1px solid var(--border); background: var(--surface); padding: 7px 12px;
+  border-radius: 8px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:disabled { opacity: .6; cursor: default; }
+.btn.small { padding: 3px 8px; font-size: 12px; }
+
+.progress { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; margin: -8px 0 16px; display: none; }
+.progress.on { display: block; }
+.progress > div { height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.tile {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; cursor: pointer; text-align: left; position: relative;
+}
+.tile:hover { border-color: var(--ink-3); }
+.tile.active { outline: 2px solid var(--accent); outline-offset: -1px; }
+.tile .num { font-size: 26px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.tile .lbl { color: var(--ink-2); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+.tile.zero .num { color: var(--ink-3); }
+
+.ico { display: inline-flex; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: #fff; flex: none; }
+.ico.good { background: var(--good); }
+.ico.warning { background: var(--warning); color: #0b0b0b; }
+.ico.serious { background: var(--serious); color: #0b0b0b; }
+.ico.critical { background: var(--critical); }
+.ico.pending { background: var(--pending); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.card h2 { font-size: 14px; margin: 0 0 2px; }
+.card .sub { color: var(--ink-2); font-size: 12.5px; margin-bottom: 8px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+#chart { position: relative; }
+#chart svg { display: block; width: 100%; height: 160px; }
+.tip {
+  position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  white-space: nowrap; display: none; z-index: 5;
+}
+.tip b { font-weight: 600; }
+.tip .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.toolbar input[type=search] {
+  flex: 1 1 240px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+}
+.toolbar select { padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.count { color: var(--ink-2); font-size: 13px; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--surface-2); position: sticky; top: 0; cursor: pointer; user-select: none; }
+th.nosort { cursor: default; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--surface-2); }
+td.num { font-variant-numeric: tabular-nums; text-align: right; }
+.badge { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; }
+.url { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.detail { color: var(--ink-2); font-size: 12.5px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip { display: flex; gap: 2px; align-items: center; height: 16px; }
+.strip i { width: 5px; height: 14px; border-radius: 1.5px; display: block; }
+.muted { color: var(--ink-3); }
+.pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 10px; }
+
+dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--ink); padding: 0; width: min(720px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(0,0,0,.4); }
+.dlg-head { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.dlg-body { padding: 14px 16px; max-height: 65vh; overflow: auto; }
+.dlg-foot { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+textarea { width: 100%; min-height: 220px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+.kv { display: grid; grid-template-columns: 130px 1fr; gap: 4px 12px; margin-bottom: 14px; font-size: 13px; }
+.kv dt { color: var(--ink-2); }
+.kv dd { margin: 0; word-break: break-all; }
+.hist td { padding: 6px 8px; font-size: 12.5px; }
+.hist table { min-width: 0; }
+.empty { padding: 40px 16px; text-align: center; color: var(--ink-2); }
+@media (max-width: 640px) {
+  .tile .num { font-size: 22px; }
+  .kv { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Website Monitor</h1>
+      <div class="meta" id="meta">Loading…</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btn-add">Add sites</button>
+      <a class="btn" href="api/export.csv">Export CSV</a>
+      <button class="btn" id="btn-theme" title="Toggle light / dark">◐</button>
+      <button class="btn primary" id="btn-run">Check now</button>
+    </div>
+  </header>
+  <div class="progress" id="progress"><div></div></div>
+
+  <section class="tiles" id="tiles" aria-label="Status summary"></section>
+
+  <section class="card">
+    <h2>Problem sites per check run</h2>
+    <div class="sub">Last 48 runs, by severity</div>
+    <div class="legend" id="legend"></div>
+    <div id="chart"><svg></svg><div class="tip"></div></div>
+  </section>
+
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="Search URL, IP, error text…" aria-label="Search">
+    <select id="filter" aria-label="Filter by status"></select>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th data-sort="severity">Status</th>
+        <th data-sort="url">Website</th>
+        <th data-sort="last_code" class="num">HTTP</th>
+        <th data-sort="last_ms" class="num">Response</th>
+        <th class="nosort">Last 24 checks</th>
+        <th data-sort="uptime_24h" class="num">Uptime 24h</th>
+        <th data-sort="status_since">Since</th>
+        <th class="nosort">Details</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>No sites yet. Click <b>Add sites</b> to paste your list.</div>
+  </div>
+  <div class="pager" id="pager"></div>
+</div>
+
+<dialog id="dlg-add">
+  <div class="dlg-head"><b>Add websites</b></div>
+  <div class="dlg-body">
+    <p class="meta" style="margin-top:0">One URL or domain per line (commas and spaces also work). Duplicates are skipped.</p>
+    <textarea id="add-text" placeholder="example.com&#10;https://shop.example.org/&#10;blog.example.net/contact"></textarea>
+    <div class="meta" id="add-msg"></div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn" data-close>Cancel</button>
+    <button class="btn primary" id="add-go">Add</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-site">
+  <div class="dlg-head"><div><b id="site-title"></b><div class="meta" id="site-sub"></div></div>
+    <button class="btn small" data-close>Close</button></div>
+  <div class="dlg-body" id="site-body"></div>
+  <div class="dlg-foot"><button class="btn" id="site-del">Remove site</button></div>
+</dialog>
+
+<script>
+const STATUS = {
+  dns_error:      { label: "DNS error",           sev: "critical" },
+  down:           { label: "Down / unreachable",  sev: "critical" },
+  db_error:       { label: "Database error",      sev: "critical" },
+  http_500:       { label: "500 server error",    sev: "critical" },
+  server_error:   { label: "5xx (502/503/504)",   sev: "critical" },
+  internal_error: { label: "Internal error page", sev: "critical" },
+  not_found:      { label: "404 not found",       sev: "serious" },
+  blank:          { label: "Blank screen",        sev: "serious" },
+  ssl_error:      { label: "SSL certificate",     sev: "warning" },
+  http_error:     { label: "Other 4xx / redirect",sev: "warning" },
+  ok:             { label: "Live / OK",           sev: "good" },
+  pending:        { label: "Not checked yet",     sev: "pending" },
+};
+const ORDER = Object.keys(STATUS);
+const ICON = { critical: "✕", serious: "!", warning: "▲", good: "✓", pending: "…" };
+const SEV_SERIES = [
+  { key: "critical", label: "Critical (DNS, down, DB, 5xx)" },
+  { key: "serious",  label: "Serious (404, blank)" },
+  { key: "warning",  label: "Warning (SSL, other 4xx)" },
+];
+const PAGE = 100;
+
+let data = null, timer = null, filter = "all", query = "", sortKey = "severity", sortDir = 1, page = 0, openSite = null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const st = s => s.last_status || "pending";
+const icon = sev => `<span class="ico ${sev}" aria-hidden="true">${ICON[sev]}</span>`;
+const badge = code => { const s = STATUS[code] || STATUS.pending; return `<span class="badge">${icon(s.sev)}${esc(s.label)}</span>`; };
+const sevColor = sev => `var(--${sev})`;
+
+function ago(t) {
+  if (!t) return "—";
+  const d = Math.max(0, (data.server_time - t));
+  if (d < 60) return `${Math.round(d)}s ago`;
+  if (d < 3600) return `${Math.round(d / 60)}m ago`;
+  if (d < 86400) return `${(d / 3600).toFixed(1)}h ago`;
+  return `${(d / 86400).toFixed(1)}d ago`;
+}
+const fmtTime = t => t ? new Date(t * 1000).toLocaleString() : "—";
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+
+async function load() {
+  try { data = await api("api/state"); } catch (e) { $("#meta").textContent = "Cannot reach the monitor server."; return; }
+  render();
+}
+
+function render() {
+  const sites = data.sites;
+  const counts = {};
+  sites.forEach(s => counts[st(s)] = (counts[st(s)] || 0) + 1);
+  const problems = sites.filter(s => st(s) !== "ok" && st(s) !== "pending").length;
+
+  // header
+  const next = data.next_run_at ? Math.max(0, Math.round((data.next_run_at - data.server_time) / 60)) : null;
+  $("#meta").innerHTML = `${sites.length} sites · every ${data.interval_min} min · last run ${data.last_run_at ? ago(data.last_run_at) : "—"}` +
+    (data.running ? ` · <b>checking ${data.progress.done}/${data.progress.total}</b>` : next !== null ? ` · next in ${next} min` : "");
+  $("#btn-run").disabled = data.running;
+  $("#btn-run").textContent = data.running ? "Checking…" : "Check now";
+  $("#progress").classList.toggle("on", data.running);
+  $("#progress > div").style.width = data.progress.total ? `${100 * data.progress.done / data.progress.total}%` : "0";
+
+  // tiles
+  const tiles = [
+    { key: "all", label: "All sites", n: sites.length, sev: null },
+    { key: "problems", label: "All problems", n: problems, sev: problems ? "critical" : "good" },
+    ...ORDER.filter(k => k !== "pending" || counts.pending).map(k => ({ key: k, label: STATUS[k].label, n: counts[k] || 0, sev: STATUS[k].sev })),
+  ];
+  $("#tiles").innerHTML = tiles.map(t => `
+    <button class="tile ${filter === t.key ? "active" : ""} ${t.n ? "" : "zero"}" data-filter="${t.key}">
+      <div class="num">${t.n}</div>
+      <div class="lbl">${t.sev ? icon(t.sev) : ""}${esc(t.label)}</div>
+    </button>`).join("");
+
+  // filter select
+  $("#filter").innerHTML = tiles.map(t => `<option value="${t.key}" ${filter === t.key ? "selected" : ""}>${esc(t.label)} (${t.n})</option>`).join("");
+
+  renderChart();
+  renderTable();
+}
+
+function renderTable() {
+  const q = query.toLowerCase();
+  let rows = data.sites.filter(s => {
+    const code = st(s);
+    if (filter === "problems" && (code === "ok" || code === "pending")) return false;
+    if (filter !== "all" && filter !== "problems" && code !== filter) return false;
+    if (q && !`${s.url} ${s.last_ip || ""} ${s.last_detail || ""} ${s.last_title || ""} ${s.last_code || ""}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const val = s => sortKey === "severity" ? ORDER.indexOf(st(s)) : s[sortKey];
+  rows.sort((a, b) => {
+    const x = val(a), y = val(b);
+    if (x === y) return a.url.localeCompare(b.url);
+    if (x === null || x === undefined) return 1;
+    if (y === null || y === undefined) return -1;
+    return (x < y ? -1 : 1) * sortDir;
+  });
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  page = Math.min(page, pages - 1);
+  const shown = rows.slice(page * PAGE, page * PAGE + PAGE);
+  $("#count").textContent = `${rows.length} shown`;
+  $("#empty").hidden = data.sites.length > 0;
+  $("#rows").innerHTML = shown.map(s => {
+    const strip = (s.recent || []).map(r => {
+      const m = STATUS[r] || STATUS.pending;
+      return `<i style="background:${sevColor(m.sev)}" title="${esc(m.label)}"></i>`;
+    }).join("");
+    return `<tr data-id="${s.id}">
+      <td>${badge(st(s))}</td>
+      <td><a class="url" href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.url)}">${esc(s.url.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a></td>
+      <td class="num">${s.last_code ?? '<span class="muted">—</span>'}</td>
+      <td class="num">${s.last_ms != null ? `${s.last_ms} ms` : '<span class="muted">—</span>'}</td>
+      <td><div class="strip" aria-label="recent checks">${strip || '<span class="muted">—</span>'}</div></td>
+      <td class="num">${s.uptime_24h != null ? `${s.uptime_24h}%` : '<span class="muted">—</span>'}</td>
+      <td class="muted">${ago(s.status_since)}</td>
+      <td><div class="detail" title="${esc(s.last_detail)}">${esc(s.last_detail) || '<span class="muted">—</span>'}</div></td>
+    </tr>`;
+  }).join("");
+  $("#pager").innerHTML = pages > 1 ? `
+    <button class="btn small" data-page="-1" ${page === 0 ? "disabled" : ""}>‹ Prev</button>
+    <span class="count">Page ${page + 1} of ${pages}</span>
+    <button class="btn small" data-page="1" ${page >= pages - 1 ? "disabled" : ""}>Next ›</button>` : "";
+  document.querySelectorAll("th[data-sort]").forEach(th => {
+    const base = th.textContent.replace(/ [▲▼]$/, "");
+    th.textContent = base + (th.dataset.sort === sortKey ? (sortDir > 0 ? " ▲" : " ▼") : "");
+  });
+}
+
+function renderChart() {
+  $("#legend").innerHTML = SEV_SERIES.map(s => `<span><i class="sw" style="background:${sevColor(s.key)}"></i>${icon(s.key)}${esc(s.label)}</span>`).join("");
+  const svg = $("#chart svg");
+  const runs = data.runs;
+  const W = svg.clientWidth || 800, H = 160, padL = 34, padB = 20, padT = 8;
+  if (!runs.length) {
+    svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--ink-3)" font-size="12">No completed runs yet</text>`;
+    return;
+  }
+  const series = runs.map(r => {
+    const out = { critical: 0, serious: 0, warning: 0 };
+    for (const [k, n] of Object.entries(r.counts)) { const sev = (STATUS[k] || {}).sev; if (sev in out) out[sev] += n; }
+    return out;
+  });
+  const max = Math.max(1, ...series.map(s => s.critical + s.serious + s.warning));
+  const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); for (const m of [1, 2, 5, 10]) if (m * p >= max) return m * p; })();
+  const slots = 48, bw = (W - padL) / slots, barW = Math.max(3, Math.min(18, bw - 3));
+  const y = v => padT + (H - padT - padB) * (1 - v / nice);
+  let g = "";
+  for (const t of [0, nice / 2, nice]) {
+    g += `<line x1="${padL}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${padL - 6}" y="${y(t) + 4}" text-anchor="end" fill="var(--ink-3)" font-size="11">${t}</text>`;
+  }
+  const offset = slots - runs.length;
+  runs.forEach((r, i) => {
+    const x = padL + (offset + i) * bw + (bw - barW) / 2;
+    let acc = 0;
+    const segs = SEV_SERIES.map(s => s.key).filter(k => series[i][k] > 0);
+    segs.forEach((k, j) => {
+      const v = series[i][k];
+      const top = y(acc + v), bottom = y(acc);
+      const gap = j > 0 ? 2 : 0;  // 2px surface gap between stacked segments
+      const h = Math.max(1, bottom - top - gap);
+      const isTop = j === segs.length - 1, rad = Math.min(4, h, barW / 2);
+      g += isTop
+        ? `<path d="M${x},${top + h} V${top + rad} Q${x},${top} ${x + rad},${top} H${x + barW - rad} Q${x + barW},${top} ${x + barW},${top + rad} V${top + h} Z" fill="${sevColor(k)}"/>`
+        : `<rect x="${x}" y="${top}" width="${barW}" height="${h}" fill="${sevColor(k)}"/>`;
+      acc += v;
+    });
+    g += `<rect class="hit" data-i="${i}" x="${padL + (offset + i) * bw}" y="${padT}" width="${bw}" height="${H - padT - padB}" fill="transparent"/>`;
+  });
+  const first = runs[0], last = runs[runs.length - 1];
+  g += `<text x="${padL + offset * bw}" y="${H - 4}" fill="var(--ink-3)" font-size="11">${new Date(first.started_at * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</text>`;
+  g += `<text x="${W}" y="${H - 4}" text-anchor="end" fill="var(--ink-3)" font-size="11">${new Date(last.started_at * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</text>`;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+
+  const tip = $("#chart .tip");
+  svg.querySelectorAll(".hit").forEach(el => {
+    el.addEventListener("mousemove", ev => {
+      const i = +el.dataset.i, r = runs[i], s = series[i];
+      const total = Object.values(r.counts).reduce((a, b) => a + b, 0);
+      tip.innerHTML = `<b>${fmtTime(r.started_at)}</b><div class="muted">${total} sites checked</div>` +
+        SEV_SERIES.map(x => `<div class="row"><span>${icon(x.key)} ${x.key}</span><b>${s[x.key]}</b></div>`).join("") +
+        `<div class="row"><span>${icon("good")} ok</span><b>${r.counts.ok || 0}</b></div>`;
+      tip.style.display = "block";
+      const box = $("#chart").getBoundingClientRect();
+      let left = ev.clientX - box.left + 12;
+      if (left + tip.offsetWidth > box.width) left = ev.clientX - box.left - tip.offsetWidth - 12;
+      tip.style.left = `${left}px`; tip.style.top = "0px";
+    });
+    el.addEventListener("mouseleave", () => tip.style.display = "none");
+  });
+}
+
+async function showSite(id) {
+  const s = data.sites.find(x => x.id === id);
+  if (!s) return;
+  openSite = id;
+  $("#site-title").textContent = s.url;
+  $("#site-sub").innerHTML = badge(st(s));
+  $("#site-body").innerHTML = `<dl class="kv">
+      <dt>Detail</dt><dd>${esc(s.last_detail) || "—"}</dd>
+      <dt>HTTP status</dt><dd>${s.last_code ?? "—"}</dd>
+      <dt>Response time</dt><dd>${s.last_ms != null ? s.last_ms + " ms" : "—"}</dd>
+      <dt>IP address</dt><dd>${esc(s.last_ip) || "—"}</dd>
+      <dt>Final URL</dt><dd>${esc(s.final_url) || "—"}</dd>
+      <dt>Page title</dt><dd>${esc(s.last_title) || "—"}</dd>
+      <dt>Last checked</dt><dd>${fmtTime(s.last_checked)}</dd>
+      <dt>Status since</dt><dd>${fmtTime(s.status_since)}</dd>
+      <dt>Uptime 24h</dt><dd>${s.uptime_24h != null ? s.uptime_24h + "%" : "—"}</dd>
+    </dl><div class="muted">Loading history…</div>`;
+  $("#dlg-site").showModal();
+  const hist = await api(`api/sites/${id}/history`);
+  $("#site-body .muted:last-child").outerHTML = `<div class="hist"><table>
+    <thead><tr><th class="nosort">Checked</th><th class="nosort">Status</th><th class="nosort">HTTP</th><th class="nosort">Time</th><th class="nosort">Detail</th></tr></thead>
+    <tbody>${hist.map(h => `<tr><td>${fmtTime(h.checked_at)}</td><td>${badge(h.status)}</td><td>${h.http_code ?? "—"}</td>
+      <td>${h.response_ms != null ? h.response_ms + " ms" : "—"}</td><td class="detail" title="${esc(h.detail)}">${esc(h.detail)}</td></tr>`).join("")}</tbody></table></div>`;
+}
+
+// --- events ---
+$("#tiles").addEventListener("click", e => { const t = e.target.closest(".tile"); if (t) { filter = t.dataset.filter; page = 0; render(); } });
+$("#filter").addEventListener("change", e => { filter = e.target.value; page = 0; render(); });
+$("#q").addEventListener("input", e => { query = e.target.value; page = 0; renderTable(); });
+document.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("click", () => {
+  if (sortKey === th.dataset.sort) sortDir = -sortDir; else { sortKey = th.dataset.sort; sortDir = 1; }
+  renderTable();
+}));
+$("#pager").addEventListener("click", e => { const b = e.target.closest("[data-page]"); if (b) { page += +b.dataset.page; renderTable(); } });
+$("#rows").addEventListener("click", e => { if (e.target.closest("a")) return; const tr = e.target.closest("tr"); if (tr) showSite(+tr.dataset.id); });
+document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
+$("#btn-run").addEventListener("click", async () => { await api("api/check-now", { method: "POST" }); setTimeout(poll, 500); });
+$("#btn-add").addEventListener("click", () => { $("#add-msg").textContent = ""; $("#dlg-add").showModal(); });
+$("#add-go").addEventListener("click", async () => {
+  const r = await api("api/sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ urls: $("#add-text").value }) });
+  $("#add-msg").textContent = `Added ${r.added} new site(s).` + (r.rejected.length ? ` Rejected: ${r.rejected.join(", ")}` : "") + " They will be checked on the next run (or click Check now).";
+  if (r.added) { $("#add-text").value = ""; filter = "all"; load(); }
+});
+$("#site-del").addEventListener("click", async () => {
+  if (openSite === null || !confirm("Remove this site and its history?")) return;
+  await api(`api/sites/${openSite}`, { method: "DELETE" });
+  $("#dlg-site").close(); load();
+});
+$("#btn-theme").addEventListener("click", () => {
+  const dark = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("theme", document.documentElement.dataset.theme); } catch (e) {}
+});
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+window.addEventListener("resize", () => data && renderChart());
+
+async function poll() {
+  clearTimeout(timer);
+  await load();
+  timer = setTimeout(poll, data && data.running ? 3000 : 20000);
+}
+poll();
+</script>
+</body>
+</html>

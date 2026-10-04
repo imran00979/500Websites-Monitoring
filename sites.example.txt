@@ -1,0 +1,6 @@
+# One website per line. Domains, full URLs or deep links all work.
+# Lines starting with # are ignored. CSV exports work too (first cell that looks like a URL).
+example.com
+https://www.wikipedia.org/
+https://github.com/
+https://httpstat.us/500

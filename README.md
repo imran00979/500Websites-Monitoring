@@ -1,5 +1,9 @@
 # Saudi Agency Lead Finder
 
+> **Website Monitor:** this repo also contains a dashboard that checks 1,000+ websites on a
+> schedule for DNS, downtime, blank screens, database errors, 404 and 500 errors.
+> See [README-monitor.md](README-monitor.md).
+
 A command-line tool that finds **digital marketing, web development, SEO, branding and
 advertising agencies in Saudi Arabia**, enriches each one from its own website and from
 search results, removes duplicates, and exports a CSV.
