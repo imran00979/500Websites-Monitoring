@@ -7,6 +7,7 @@ import json
 import logging
 import threading
 import time
+from collections import Counter
 from pathlib import Path
 from urllib import robotparser
 from urllib.parse import urlsplit
@@ -41,6 +42,8 @@ class Fetcher:
         self._robots: dict[str, robotparser.RobotFileParser | None] = {}
         self._last_hit: dict[str, float] = {}
         self._lock = threading.Lock()
+        # Non-cached API requests per host, so runs can report quota usage.
+        self.api_calls: Counter = Counter()
 
     # -- politeness -------------------------------------------------------
     def _wait_for_host(self, host: str) -> None:
@@ -120,7 +123,10 @@ class Fetcher:
             cached = self._cache_get(key)
             if cached is not None:
                 return cached
-        self._wait_for_host(urlsplit(url).netloc)
+        host = urlsplit(url).netloc
+        self._wait_for_host(host)
+        with self._lock:
+            self.api_calls[host] += 1
         try:
             resp = self.session.request(method, url, timeout=self.timeout, **kwargs)
         except requests.RequestException as exc:

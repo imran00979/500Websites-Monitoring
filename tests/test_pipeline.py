@@ -17,7 +17,7 @@ def test_dedupe_by_domain_phone_and_name():
         Lead(agency_name="Acme Digital", website="https://www.acmedigital.com.sa",
              sources=["brave"], categories=["seo"]),
         Lead(agency_name="ACME DIGITAL AGENCY", website="https://acmedigital.com.sa",
-             phones=["+966551234567"], sources=["google_places"], address="Riyadh, Saudi Arabia",
+             phones=["+966551234567"], sources=["places"], address="Riyadh, Saudi Arabia",
              categories=["branding"]),
         Lead(agency_name="Acme (Instagram only)", phones=["+966551234567"], sources=["serpapi"]),
         Lead(agency_name="Acme Digital", website="https://acme-digital.ae"),  # different site
@@ -27,7 +27,7 @@ def test_dedupe_by_domain_phone_and_name():
     assert len(out) == 3
     acme = out[0]
     assert acme.agency_name == "ACME DIGITAL AGENCY"  # Places name preferred
-    assert acme.sources == ["brave", "google_places", "serpapi"]
+    assert acme.sources == ["brave", "places", "serpapi"]
     assert acme.categories == ["seo", "branding"]
     assert out[1].website == "https://acme-digital.ae"
 
@@ -83,7 +83,7 @@ def test_full_pipeline_to_csv(fetcher, tmp_path):
     existing = [Lead(agency_name="Old Lead", website="https://old.sa", city="Dammam",
                      emails=["hi@old.sa"], sources=["seed"])]
     cfg = RunConfig(cities=["Riyadh"], categories=["seo", "digital_marketing"],
-                    sources=[WebSearchSource(engine)], existing=existing,
+                    providers=[WebSearchSource(engine)], existing=existing,
                     arabic_queries=False, workers=2)
     leads = run(cfg, fetcher)
     names = [lead.agency_name for lead in leads]

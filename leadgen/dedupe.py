@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .models import Lead
 from .normalize import dedupe_list, normalize_name, registered_domain
+from .sources.base import MAP_SOURCES
 
 
 def _keys(lead: Lead) -> list[tuple[str, str]]:
@@ -28,8 +29,8 @@ def _compatible(a: Lead, b: Lead) -> bool:
 
 
 def merge_into(target: Lead, other: Lead) -> None:
-    # Google Places names/addresses are the registered business details: prefer them.
-    if "google_places" in other.sources and "google_places" not in target.sources:
+    # Map listing names/addresses are the registered business details: prefer them.
+    if MAP_SOURCES & set(other.sources) and not MAP_SOURCES & set(target.sources):
         target.agency_name = other.agency_name or target.agency_name
         target.address = other.address or target.address
         target.city = other.city or target.city
@@ -45,21 +46,37 @@ def merge_into(target: Lead, other: Lead) -> None:
     target.site_city_mentions = max(target.site_city_mentions, other.site_city_mentions)
 
 
-def dedupe(leads: list[Lead]) -> list[Lead]:
-    merged: list[Lead] = []
-    index: dict[tuple[str, str], int] = {}
-    for lead in leads:
+class LeadIndex:
+    """Incremental deduplication: add leads one at a time, duplicates are merged."""
+
+    def __init__(self):
+        self.leads: list[Lead] = []
+        self._index: dict[tuple[str, str], int] = {}
+
+    def __len__(self) -> int:
+        return len(self.leads)
+
+    def add(self, lead: Lead) -> tuple[Lead, bool]:
+        """Add a lead. Returns (the stored lead, True if it is a new agency)."""
         match = None
         for key in _keys(lead):
-            i = index.get(key)
-            if i is not None and _compatible(merged[i], lead):
+            i = self._index.get(key)
+            if i is not None and _compatible(self.leads[i], lead):
                 match = i
                 break
-        if match is None:
-            merged.append(lead)
-            match = len(merged) - 1
+        is_new = match is None
+        if is_new:
+            self.leads.append(lead)
+            match = len(self.leads) - 1
         else:
-            merge_into(merged[match], lead)
-        for key in _keys(merged[match]):
-            index.setdefault(key, match)
-    return merged
+            merge_into(self.leads[match], lead)
+        for key in _keys(self.leads[match]):
+            self._index.setdefault(key, match)
+        return self.leads[match], is_new
+
+
+def dedupe(leads: list[Lead]) -> list[Lead]:
+    index = LeadIndex()
+    for lead in leads:
+        index.add(lead)
+    return index.leads

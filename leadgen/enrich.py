@@ -11,6 +11,7 @@ from .extract import parse_page, role_rank
 from .http import Fetcher
 from .models import Lead
 from .normalize import dedupe_list, is_non_agency_domain, normalize_url, registered_domain
+from .sources.base import MAP_SOURCES, SEARCH_SOURCES
 
 log = logging.getLogger(__name__)
 
@@ -91,15 +92,15 @@ def _merge_pages(lead: Lead, pages) -> None:
     city_counts: Counter = Counter()
     for p in pages:
         city_counts.update(p.city_counts)
-    # Places gives a verified address city; for search/seed leads trust the site's own text.
-    if city_counts and ("google_places" not in lead.sources or not lead.city):
+    # Map listings give a verified address city; for search/seed leads trust the site's own text.
+    if city_counts and (not MAP_SOURCES & set(lead.sources) or not lead.city):
         lead.city = city_counts.most_common(1)[0][0]
     lead.site_city_mentions = sum(city_counts.values())
 
     # Search-result titles are often SEO copy ("Best SEO Company in Riyadh"); the site's
-    # own og:site_name / schema.org name is a better agency name. Places names are kept.
+    # own og:site_name / schema.org name is a better agency name. Map listing names are kept.
     site_name = pages[0].site_name
-    from_search = bool(set(lead.sources) & {"brave", "serpapi"}) and "google_places" not in lead.sources
+    from_search = bool(SEARCH_SOURCES & set(lead.sources)) and not MAP_SOURCES & set(lead.sources)
     if site_name and (not lead.agency_name or from_search):
         lead.agency_name = site_name
     lead.agency_name = lead.agency_name or _name_from_domain(lead.website)

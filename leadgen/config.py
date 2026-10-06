@@ -33,6 +33,16 @@ CITIES: dict[str, list[str]] = {
     "Jazan": ["jazan", "jizan", "جازان"],
 }
 
+# City centre (lat, lng) used to bias map searches towards the city.
+CITY_COORDS: dict[str, tuple[float, float]] = {
+    "Riyadh": (24.7136, 46.6753), "Jeddah": (21.5433, 39.1728), "Dammam": (26.4207, 50.0888),
+    "Khobar": (26.2172, 50.1971), "Dhahran": (26.2361, 50.0393), "Mecca": (21.3891, 39.8579),
+    "Medina": (24.5247, 39.5692), "Taif": (21.2703, 40.4158), "Abha": (18.2465, 42.5117),
+    "Khamis Mushait": (18.3000, 42.7333), "Tabuk": (28.3835, 36.5662), "Buraidah": (26.3260, 43.9750),
+    "Hail": (27.5114, 41.6900), "Jubail": (27.0046, 49.6460), "Al Ahsa": (25.3830, 49.5860),
+    "Yanbu": (24.0890, 38.0637), "Najran": (17.4917, 44.1322), "Jazan": (16.8892, 42.5511),
+}
+
 # Cities searched by default (the largest agency markets).
 DEFAULT_CITIES = ["Riyadh", "Jeddah", "Dammam", "Khobar", "Mecca", "Medina"]
 

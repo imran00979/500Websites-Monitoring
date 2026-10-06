@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 
-from ..http import Fetcher
+from ..config import CITY_COORDS
 from ..extract import canonical_city
+from ..http import Fetcher
 from ..models import Lead
 from ..normalize import normalize_phone, normalize_url
+from .base import ProviderSettings
 
 log = logging.getLogger(__name__)
 
@@ -25,12 +27,12 @@ FIELD_MASK = ",".join([
 
 
 class GooglePlacesSource:
-    name = "google_places"
+    name = "places"
 
-    def __init__(self, api_key: str, fetcher: Fetcher, max_pages: int = 3):
+    def __init__(self, api_key: str, fetcher: Fetcher, settings: ProviderSettings | None = None):
         self.api_key = api_key
         self.fetcher = fetcher
-        self.max_pages = max_pages  # 20 results per page, Google caps at 60
+        self.settings = settings or ProviderSettings()
 
     def discover(self, phrase: str, city: str, category: str) -> list[Lead]:
         headers = {"X-Goog-Api-Key": self.api_key, "X-Goog-FieldMask": FIELD_MASK}
@@ -40,8 +42,13 @@ class GooglePlacesSource:
             "languageCode": "en",
             "pageSize": 20,
         }
+        if city in CITY_COORDS:
+            lat, lng = CITY_COORDS[city]
+            body["locationBias"] = {
+                "circle": {"center": {"latitude": lat, "longitude": lng}, "radius": 30000.0}
+            }
         leads: list[Lead] = []
-        for _ in range(self.max_pages):
+        for _ in range(self.settings.map_pages):  # Google caps text search at 3 pages
             data = self.fetcher.api_json("POST", ENDPOINT, json=body, headers=headers)
             if not data:
                 break
@@ -79,7 +86,6 @@ class GooglePlacesSource:
             phones=[phone] if phone else [],
             categories=[category],
             address=address,
-            sources=["google_places"],
+            sources=["places"],
             snippet=" ".join(place.get("types", [])),
         )
-

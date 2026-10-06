@@ -7,7 +7,7 @@ import logging
 from ..http import Fetcher
 from ..models import Lead
 from ..normalize import clean_name, is_non_agency_domain, normalize_url
-from .base import SearchResult, WebSearch
+from .base import ProviderSettings, SearchResult, WebSearch
 
 log = logging.getLogger(__name__)
 
@@ -71,10 +71,10 @@ class SerpApiSearch:
 class WebSearchSource:
     """Discovery via organic search results, keeping only likely agency homepages."""
 
-    def __init__(self, engine: WebSearch, max_results: int = 30):
+    def __init__(self, engine: WebSearch, settings: ProviderSettings | None = None):
         self.engine = engine
         self.name = engine.name
-        self.max_results = max_results
+        self.max_results = (settings or ProviderSettings()).results_per_query
 
     def discover(self, phrase: str, city: str, category: str) -> list[Lead]:
         query = f"{phrase} {city} Saudi Arabia"

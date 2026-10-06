@@ -197,9 +197,11 @@ def _founders_from_html(soup: BeautifulSoup) -> list[tuple[str, str]]:
     for m in re.finditer(rf"({role_words})\s*(?:[:–\-]|is|,)\s*({EN_NAME})", text):
         if _looks_like_name(m.group(2)):
             found.append((m.group(2), m.group(1)))
-    for m in re.finditer(rf"(المؤسس|مؤسس الشركة|الرئيس التنفيذي|المدير العام)\s*[:\-–]?\s*(?:الأستاذ|الاستاذ|م\.|د\.)?\s*({AR_NAME})", text):
-        name = " ".join(m.group(2).split()[:3])
-        found.append((name, m.group(1)))
+    # Arabic: match inside one text node so the name can't run into the next line.
+    ar_role = re.compile(rf"(المؤسس|مؤسس الشركة|الرئيس التنفيذي|المدير العام)\s*[:\-–]?\s*(?:الأستاذ|الاستاذ|م\.|د\.)?\s*({AR_NAME})")
+    for node in soup.find_all(string=ar_role):
+        for m in ar_role.finditer(str(node)):
+            found.append((" ".join(m.group(2).split()[:4]), m.group(1)))
     found.sort(key=lambda f: role_rank(f[1]))
     return found
 
